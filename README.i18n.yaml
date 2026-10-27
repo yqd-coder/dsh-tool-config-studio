@@ -1,0 +1,9 @@
+# Locale → README mapping for dsh-tool-config-studio.
+# Consumed by DSH tooling (when available) and by humans; safe to ignore
+# for anything else.
+defaultLocale: en
+locales:
+  en:
+    readme: README.md
+  zh:
+    readme: README.zh.md

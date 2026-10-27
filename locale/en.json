@@ -1,0 +1,57 @@
+{
+  "app": {
+    "title": "DSH Tool Config Studio",
+    "subtitle": "Browse every registered tool, adjust stored defaults, and restore any change with one click.",
+    "version": "v{version}"
+  },
+  "actions": {
+    "restoreAll": "Restore all defaults",
+    "restoreAllConfirm": "Restore every tool to its factory defaults? All {count} stored override(s) will be removed.",
+    "restoreTool": "Restore this tool",
+    "reset": "Reset"
+  },
+  "list": {
+    "searchPlaceholder": "Search tools, parameters, categories…",
+    "toolsCount": "{count} tools",
+    "noResults": "No tools match “{query}”.",
+    "configurableCount": "{count} configurable",
+    "modified": "modified"
+  },
+  "status": {
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "allDefaults": "All tools at defaults",
+    "customized": "{tools} tools, {params} parameters customized"
+  },
+  "detail": {
+    "enabled": "Enabled",
+    "storedDefaults": "Stored defaults",
+    "perCall": "Per-call arguments (read-only)",
+    "noStored": "No stored configuration — this tool takes all of its arguments per call.",
+    "noPerCall": "This tool takes no arguments."
+  },
+  "param": {
+    "default": "default: {value}",
+    "defaultUnset": "default: not set",
+    "min": "min {n}",
+    "required": "required per call",
+    "type": "{type}",
+    "readOnly": "set on every call"
+  },
+  "editor": {
+    "unset": "not set"
+  },
+  "categories": {
+    "filesystem": "Filesystem",
+    "search": "Search",
+    "shell": "Shell & commands",
+    "workspace": "Workspace",
+    "agent": "Agents & subagents",
+    "jobs": "Background jobs",
+    "goal": "Goals",
+    "schedule": "Schedules & reminders",
+    "web": "Web",
+    "planning": "Planning & tasks",
+    "interaction": "User interaction"
+  }
+}

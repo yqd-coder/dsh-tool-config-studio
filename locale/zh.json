@@ -1,0 +1,57 @@
+{
+  "app": {
+    "title": "DSH 工具配置中心",
+    "subtitle": "浏览所有已注册工具，调整已存储的默认值，一键恢复任意更改。",
+    "version": "v{version}"
+  },
+  "actions": {
+    "restoreAll": "恢复全部默认配置",
+    "restoreAllConfirm": "将所有工具恢复为出厂默认配置？已存储的 {count} 项自定义将被移除。",
+    "restoreTool": "恢复此工具的默认配置",
+    "reset": "重置"
+  },
+  "list": {
+    "searchPlaceholder": "搜索工具、参数、分类…",
+    "toolsCount": "共 {count} 个工具",
+    "noResults": "没有匹配 “{query}” 的工具。",
+    "configurableCount": "{count} 项可配置",
+    "modified": "已修改"
+  },
+  "status": {
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "allDefaults": "所有工具均为默认配置",
+    "customized": "已自定义 {tools} 个工具、{params} 个参数"
+  },
+  "detail": {
+    "enabled": "启用",
+    "storedDefaults": "已存储的默认值",
+    "perCall": "按次调用参数（只读）",
+    "noStored": "无已存储配置 —— 该工具的所有参数均在每次调用时提供。",
+    "noPerCall": "该工具没有参数。"
+  },
+  "param": {
+    "default": "默认值：{value}",
+    "defaultUnset": "默认值：未设置",
+    "min": "最小值 {n}",
+    "required": "每次调用必填",
+    "type": "{type}",
+    "readOnly": "每次调用时设置"
+  },
+  "editor": {
+    "unset": "未设置"
+  },
+  "categories": {
+    "filesystem": "文件系统",
+    "search": "搜索",
+    "shell": "Shell 与命令",
+    "workspace": "工作区",
+    "agent": "智能体与子智能体",
+    "jobs": "后台任务",
+    "goal": "目标",
+    "schedule": "计划与提醒",
+    "web": "网络",
+    "planning": "规划与任务",
+    "interaction": "用户交互"
+  }
+}

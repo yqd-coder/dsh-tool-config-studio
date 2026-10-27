@@ -1,0 +1,60 @@
+{
+  "name": "dsh-tool-config-studio",
+  "description": "DSH client plugin: browse every registered tool, edit its configuration, and restore defaults with confidence.",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [],
+      "platform": "web"
+    }
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/client.js",
+    "src/**/*.js",
+    "src/**/*.json",
+    "src/**/*.css",
+    "demo/index.html",
+    "demo/server.mjs"
+  ],
+  "scripts": {
+    "test": "node --test test/",
+    "demo": "node demo/server.mjs"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "client-ui",
+    "tools",
+    "configuration",
+    "settings"
+  ],
+  "license": "MIT",
+  "author": "yqd-coder",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yqd-coder/dsh-tool-config-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yqd-coder/dsh-tool-config-studio/issues"
+  },
+  "homepage": "https://github.com/yqd-coder/dsh-tool-config-studio#readme",
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Standalone demo of the DSH Tool Config Studio plugin: browse every registered tool, edit stored defaults, and restore defaults."
+    />
+    <title>DSH Tool Config Studio — demo</title>
+    <link rel="stylesheet" href="/src/ui/styles.css" />
+    <style>
+      html {
+        background: #0d1017;
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app"></main>
+    <noscript>
+      <p style="padding: 24px; font-family: sans-serif; color: #e8ebf0">
+        This demo requires JavaScript to render the Tool Config Studio.
+      </p>
+    </noscript>
+    <script type="module">
+      import { mountToolConfigStudio } from "/src/client.js";
+      mountToolConfigStudio(document.getElementById("app"));
+    </script>
+  </body>
+</html>

@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-面向 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的客户端插件，把工具目录变成一个配置面板：**浏览所有已注册工具，点击任意工具展开并修改它的配置，改错了——一键恢复默认。**
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（DSH）的**捆绑包（bundle）插件**，把工具目录变成一个配置面板：**浏览所有已注册工具，点击任意工具展开并修改它的配置，改错了——一键恢复默认。** 可从 DSH 的插件页直接安装，并在侧边栏增加 *工具配置中心* 面板。
 
 ## 为什么需要它
 
@@ -17,9 +17,19 @@ DSH 的每个工具都有参数，其中相当一部分带有可调节的"存储
 - **分层恢复** — 重置单个参数、把整个工具恢复出厂、或**恢复全部默认**（带确认弹窗）。存储只保存"与目录的偏离"，因此恢复就是编辑的严格逆操作，绝不会误伤其他配置。
 - **持久化** — 改动通过 `localStorage`（键 `dsh-tool-config-studio.v1`）在刷新后保留；无存储环境自动降级为内存模式，不报错。
 - **国际化** — 中文与英文，自动检测（`navigator.language`，Node 下用 `LANG`），挂载时可覆盖。
-- **零依赖** — 纯 ESM、无构建步骤。任何现代浏览器可运行；测试与演示服务器要求 Node ≥ 22。
+- **零运行时依赖** — 源码为纯 ESM；DSH 浏览器端是一个零依赖构建产物（传统 script，无需 ESM 加载器）。任何现代浏览器可运行；测试与演示服务器要求 Node ≥ 22。
 
 ## 快速开始
+
+### 在 DSH 中安装（桌面版或 Web 版）
+
+本包是一个 **DSH 捆绑包（bundle）**，从插件页安装：
+
+1. 打开 DSH 侧边栏的**插件（Plugins）** → **添加插件（Add plugin）**。
+2. 粘贴仓库地址：`https://github.com/yqd-coder/dsh-tool-config-studio.git`
+3. 确认。插件管理器会拉取仓库、安装到当前 profile 并启用捆绑包——侧边栏出现**工具配置中心**入口，插件列表中可见该捆绑包（可开关）。
+
+卸载或关闭捆绑包会移除面板；已保存的配置（localStorage）不受影响。
 
 ### 运行演示（无需 DSH）
 
@@ -38,12 +48,12 @@ npm run demo
 npm test
 ```
 
-使用 Node 内置测试运行器（`node --test test/`）——无框架、无需安装。37 个测试覆盖目录完整性、状态机、校验、持久化，以及端到端 UI 冒烟测试。
+使用 Node 内置测试运行器（`node --test test/`）——无框架、无需安装。40 个测试覆盖目录完整性、状态机、校验、持久化、端到端 UI 冒烟测试，以及已构建 DSH 捆绑包的加载器契约。
 
-### 嵌入 DSH Web 客户端
+### 嵌入到自己的 Web 应用
 
 ```js
-import { mountToolConfigStudio } from "dsh-tool-config-studio/client";
+import { mountToolConfigStudio } from "dsh-tool-config-studio/src/client.js";
 
 const handle = mountToolConfigStudio(document.getElementById("app"));
 // ...
@@ -52,18 +62,19 @@ handle.unmount();
 
 选项：`{ store, persistence, i18n, language }` —— 均可注入，便于测试或自定义宿主（见 [docs/architecture.md](docs/architecture.md)）。
 
-### 作为 DSH 插件安装
+> `dsh-tool-config-studio/client` 是**已构建的 DSH 模块捆绑包**（供 DSH 加载器使用的浏览器传统 script，不能直接 `import`）。自定义宿主请使用 `/src/client.js` 的 ESM 源码。
 
-本包遵循 DSH 自带 Web 包所用的客户端插件约定：
+### DSH 捆绑包的接线方式
 
 | 文件 | 作用 |
 | --- | --- |
+| `cordis.patch.yml` | 捆绑包补丁：插入一行，`tool-config-studio`，以本包命名 |
+| `package.json` | `dsh.bundle.patch` + `dsh.client`（web 平台）、入口 `exports` 映射 |
+| `lib/client.js` | 已构建的浏览器模块捆绑包——向 `window.__ModuleLoader__` 注册、注入 CSS、提供 `apply(ctx)` |
 | `lib/index.js` | 宿主加载入口（纯浏览器插件 → 空 `apply()`） |
-| `lib/client.js` | 客户端入口，导出 `mountToolConfigStudio` 与核心 API |
-| `locale/{en,zh}.json` | 界面文案字典 |
-| `package.json` | `dsh.client.platform: "web"`、入口 `exports` 映射 |
+| `locale/{en,zh}.json` | 界面文案字典（另含捆绑包卡片 `meta.title`） |
 
-经过测试、受支持的使用方式是独立演示页与 `mountToolConfigStudio`；profile 捆绑包安装取决于你的 DSH 构建的插件流水线。
+该行的浏览器端由 DSH 客户端模块系统加载：捆绑包惰性物化，通过 `ctx.slots` 注册侧边栏面板与主面板，并挂载与演示页相同的 `mountToolConfigStudio` 界面。完整模块契约见 [docs/architecture.md](docs/architecture.md)。
 
 ## 30 秒理解配置模型
 
@@ -76,21 +87,23 @@ handle.unmount();
 ## 目录结构
 
 ```
+├── build/           client.mjs —— 零依赖构建 DSH 浏览器捆绑包
+├── cordis.patch.yml 捆绑包补丁（行：tool-config-studio）
 ├── demo/            独立演示页 + 零依赖静态服务器
 ├── docs/            architecture.md、configuration-model.md
-├── lib/             发布入口垫片（DSH 加载器约定）
+├── lib/             index.js 宿主垫片 + client.js 已构建的 DSH 模块捆绑包
 ├── locale/          en.json、zh.json 界面字典
 ├── src/
 │   ├── client.js    客户端入口：mountToolConfigStudio + 完整公开 API
 │   ├── index.js     宿主入口（纯浏览器 → 空操作）
 │   ├── core/        catalog、store、validate、persistence —— 无 DOM、纯逻辑
 │   └── ui/          i18n、render（纯 DOM 构造器）、app（控制器）、styles.css
-└── test/            node --test 测试套件（含基于迷你 DOM 桩的 UI 冒烟测试）
+└── test/            node --test 测试套件（含 DOM 冒烟测试与捆绑包契约测试）
 ```
 
 ## API 一览
 
-| 导出（来自 `/client`） | 用途 |
+| 导出（来自 `/src/client.js`） | 用途 |
 | --- | --- |
 | `mountToolConfigStudio(container, options?)` | 挂载整个界面；返回 `{ store, app, unmount }` |
 | `ToolConfigStore` | 只存覆盖值的状态机（`setParam`、`setEnabled`、`restoreTool`、`restoreAll`、`toJSON`、`fromJSON`、`subscribe`） |

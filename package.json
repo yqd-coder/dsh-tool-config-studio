@@ -1,7 +1,7 @@
 {
   "name": "dsh-tool-config-studio",
-  "description": "DSH client plugin: browse every registered tool, edit its configuration, and restore defaults with confidence.",
-  "version": "0.1.0",
+  "description": "DSH bundle + client plugin: browse every registered tool, edit its configuration, and restore defaults with confidence.",
+  "version": "0.2.0",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -11,17 +11,22 @@
     "./client": {
       "default": "./lib/client.js"
     },
+    "./cordis.patch.yml": "./cordis.patch.yml",
     "./src/*": "./src/*",
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json"
   },
   "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "inject": [],
       "platform": "web"
     }
   },
   "files": [
+    "cordis.patch.yml",
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
@@ -33,11 +38,13 @@
   ],
   "scripts": {
     "test": "node --test test/",
+    "build": "node build/client.mjs",
     "demo": "node demo/server.mjs"
   },
   "keywords": [
     "dsh",
     "deepseek-harness",
+    "bundle",
     "plugin",
     "client-ui",
     "tools",

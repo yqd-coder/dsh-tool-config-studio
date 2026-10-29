@@ -1,0 +1,10 @@
+# dsh-tool-config-studio bundle patch.
+#
+# A single web row that mounts the Tool Config Studio panel into the shell.
+# The row's name is this package itself: the node half is the package root
+# (a no-op `apply`), and the browser half is the built `./client` module
+# bundle, which registers the sidebar entry and the main panel keyed
+# `tool-config-studio`.
+- insert:
+    - id: tool-config-studio
+      name: 'dsh-tool-config-studio'

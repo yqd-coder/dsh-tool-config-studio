@@ -6,9 +6,11 @@
  * available), the i18n bundle, and the DOM application, then mounts them
  * into a container element.
  *
- * Standalone usage (see demo/index.html):
+ * Standalone usage (see demo/index.html). Import this ESM source directly —
+ * the package's `./client` export is the built DSH module bundle (a browser
+ * classic script), while `/src/client.js` stays plain ESM for embedding:
  *
- *   import { mountToolConfigStudio } from "dsh-tool-config-studio/client";
+ *   import { mountToolConfigStudio } from "dsh-tool-config-studio/src/client.js";
  *   const handle = mountToolConfigStudio(document.getElementById("app"));
  *   // ... later:
  *   handle.unmount();

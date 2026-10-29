@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-29
+
+### Added
+
+- **DSH bundle** — the package now declares `dsh.bundle.patch` (`cordis.patch.yml`) and installs as a first-class plugin from the Plugins page (paste the repository URL); it inserts one web row, `tool-config-studio`.
+- **Built browser module bundle** (`lib/client.js`, new) — a committed classic script following DSH's client module contract: registers with `window.__ModuleLoader__` under the package id, lazily materializes through a `(require) => exports` factory, injects the CSS as a tracked `data-plugin-css` style tag, and exposes `inject` + `apply(ctx)`.
+- **Sidebar + main panel** — `apply(ctx)` registers a `sidebar.panellist` entry (host-localized label via a registered locale namespace) and a `main` panel keyed `tool-config-studio` that mounts the existing `mountToolConfigStudio` UI (React is the shell, 15 lines of glue).
+- **Zero-dependency build** (`build/client.mjs`) — deterministic ESM → classic-bundle transform of the shipped sources (JSON + CSS inlined); fails fast on unsupported ESM forms.
+- **Bundle contract tests** — `test/bundle-contract.test.js` (3 tests) rebuilds the bundle in-process and executes it under a `__ModuleLoader__` stub, a fake client context, and minimal React + DOM stubs: registration, lazy materialization, CSS injection, slot registrations, and a real UI mount/unmount.
+- Bundle display `meta.title` in both locale files.
+
+### Changed
+
+- `lib/client.js` is now the built loader bundle (previously a re-export shim). Custom hosts should import the ESM source at `/src/client.js` instead of `/client`.
+- Package version, description, `exports`/`files` (`./cordis.patch.yml`), and `build` script.
+- Test count 37 → 40.
+
+### Docs
+
+- README (EN/中文): install-from-Plugins-page instructions, updated wiring table and layout.
+- `docs/architecture.md`: full client module contract + build section.
+- `CONTRIBUTING.md`: build step, supported-ESM-forms rule, updated checklist.
+
 ## [0.1.0] - 2026-10-27
 
 ### Added
@@ -22,5 +45,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Test suite**: 37 tests on `node --test` — catalog integrity, store behavior matrix, validation, persistence (in-memory storage doubles), and an end-to-end UI smoke test on a minimal in-memory DOM.
 - **Documentation**: bilingual README, architecture and configuration-model docs, contributing guide.
 
-[Unreleased]: https://github.com/yqd-coder/dsh-tool-config-studio/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/yqd-coder/dsh-tool-config-studio/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/yqd-coder/dsh-tool-config-studio/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yqd-coder/dsh-tool-config-studio/releases/tag/v0.1.0

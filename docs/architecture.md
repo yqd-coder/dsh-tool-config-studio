@@ -16,7 +16,8 @@ This is what makes the entire domain logic unit-testable on plain Node, and what
                         │ imports /src/client.js over http
         ┌───────────────┴────────────────────────────────────────────┐
         │  src/client.js        public API: mountToolConfigStudio    │
-        │  lib/client.js        DSH loader shim (re-export)          │
+        │  lib/client.js        built DSH module bundle (committed)  │
+        │  build/client.mjs     zero-dependency build of the bundle  │
         │  src/index.js / lib/index.js   host entry (browser-only)   │
         └───────────────▲────────────────────────────────────────────┘
                         │
@@ -117,17 +118,43 @@ Dictionaries are plain JSON (`locale/en.json`, `locale/zh.json`), imported with 
 | `core/validate.js` | Per-type accept/reject cases, stable error codes |
 | `core/store.js` | Full behavior matrix: defaults, overrides, both restore levels, serialization round-trips, lenient hydration, event order |
 | `core/persistence.js` | In-memory Web-Storage doubles: round-trip, version gating, corrupt JSON, throwing storage, missing storage |
-| `ui` (integration) | `test/dom-smoke.test.js` installs a ~100-line in-memory DOM stub (the exact surface the app uses) and drives the real app end-to-end: mount → expand → edit → validation error → correction → disable → restore-all → unmount cycles |
+| `ui` (integration) | `test/dom-smoke.test.js` installs the shared in-memory DOM stub (the exact surface the app uses) and drives the real app end-to-end: mount → expand → edit → validation error → correction → disable → restore-all → unmount cycles |
+| DSH bundle | `test/bundle-contract.test.js` re-runs the build in-process and executes the emitted classic script in a vm sandbox with a `__ModuleLoader__` stub, a fake client context, and minimal React + DOM stubs: registration → lazy materialization → CSS injection → `inject`/`apply` contract → slot registrations → a real UI mount and unmount |
 
-Running: `npm test` (`node --test test/`). No fixtures, no network, no build step; the whole suite runs in under a second.
+Running: `npm test` (`node --test test/`). No fixtures, no network; the bundle contract test rebuilds `lib/client.js` in-process, so a stale committed bundle is caught immediately. The whole suite runs in a couple of seconds.
 
 ## DSH integration surface
 
-The published entry points follow the convention of DSH's shipped web packages:
+This package is a **DSH bundle**: `package.json` declares `dsh.bundle.patch: "./cordis.patch.yml"`, and the patch inserts a single web row:
 
-- `package.json` → `dsh.client = { platform: "web", inject: [] }`; `exports` maps `.`, `./client`, `./src/*`, `./locale/*.json`.
-- `lib/index.js` re-exports `apply()` from `src/index.js` (a no-op: this plugin has no host-side behavior).
-- `lib/client.js` re-exports the full public API from `src/client.js`.
-- `locale/{en,zh}.json` are importable dictionaries in the DSH locale-dictionary shape.
+```yaml
+- insert:
+    - id: tool-config-studio
+      name: 'dsh-tool-config-studio'
+```
 
-The supported integration is `mountToolConfigStudio(container, options)` from a DSH web client (or any page): it wires persistence → store → i18n → app and returns `{ store, app, unmount }`. Because every collaborator is injectable, a host that already keeps settings elsewhere (e.g. in a profile patch) can pass its own `store` and `persistence` and reuse the whole UI.
+A row's `name` is the package itself — the node half is the package root (`lib/index.js`, a no-op `apply()`), and the browser half is the built `./client` module bundle, which DSH's client module system loads as a classic `<script>` from `/plugins/dsh-tool-config-studio/client.js`.
+
+### The client module contract
+
+The built bundle (`lib/client.js`) follows the loader protocol of DSH's shipped client packages:
+
+1. **Registration** — at script-execution time the bundle calls `window.__ModuleLoader__.load({ id, factory })`, where `id` is the bare package name. This only *registers* a factory; nothing else runs.
+2. **Materialization** — on first import (row activation) the loader calls `factory(require)` once and memoizes the result. `require` is the synchronous module-table require, seeded with platform singletons (`react`, `react/jsx-runtime`); this bundle only ever requires `react`.
+3. **Side effects belong to materialization** — the CSS is injected inside the factory as a `<style data-plugin-css="dsh-tool-config-studio">` tag, which the shell's loader tracks (and removes when the row is torn down).
+4. **Entry exports** — the materialized module exposes the client-entry contract: `inject: ["slots", "locale"]` (the services the row fiber must have) and `apply(ctx)`.
+5. **`apply(ctx)`** — registers, via `ctx.effect` (disposable with the entry's lifetime), a locale namespace whose `panel` key drives the sidebar label in the host language, then registers two slots:
+   - `sidebar.panellist` — the panel entry: `{ id: "tool-config-studio", order: 100, label: () => t("panel"), locale }` + an SVG icon component;
+   - `main` — the panel body, keyed `tool-config-studio`: a small React component that renders a ref `<div>` and, in a `useEffect`, calls `mountToolConfigStudio(ref.current)` and unmounts in the cleanup.
+
+So the DSH surface and the standalone demo run the *exact same* `mountToolConfigStudio` — the React component is a 15-line shell around the framework-free DOM app.
+
+### Building the bundle
+
+`build/client.mjs` is a zero-dependency, deterministic mini-bundler: it resolves the static import graph of the shipped ESM sources from `src/client.js`, wraps each module in a CJS-style scope (`__req` for imports, `__exports` assignments at module level), inlines the JSON data files and `styles.css`, composes the DSH entry (React glue + slot registration, generated code not kept in `src/`), and emits one classic script. It supports only the ESM forms the sources use (named imports, JSON default imports with `with { type: "json" }`, `export function/const/class`, `export * from`, `export { a } from`) and fails fast on anything else — which keeps the source trivially simple.
+
+The built `lib/client.js` is a **committed artifact**, the same way DSH's own packages ship prebuilt `lib/`: install-time needs no build step, and `test/bundle-contract.test.js` re-runs the build and exercises the emitted file (loader registration, materialization, CSS injection, slot registration, and a real mount/unmount of the UI under a React + DOM stub). After changing `src/` or the entry, run `npm run build` and commit the regenerated `lib/client.js`.
+
+### Embedding outside DSH
+
+`mountToolConfigStudio(container, options)` from `/src/client.js` (plain ESM) is the supported surface for custom hosts — it wires persistence → store → i18n → app and returns `{ store, app, unmount }`. Because every collaborator is injectable, a host that already keeps settings elsewhere (e.g. in a profile patch) can pass its own `store` and `persistence` and reuse the whole UI. (`./client` is the built loader bundle — not for direct `import`.)

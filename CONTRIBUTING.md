@@ -13,11 +13,12 @@ Thanks for your interest! The project is small on purpose — the bar for contri
 git clone https://github.com/yqd-coder/dsh-tool-config-studio.git
 cd dsh-tool-config-studio
 
-npm test        # node --test test/   — 37 tests, < 1s
+npm test        # node --test test/   — 40 tests, ~2s
+npm run build   # rebuild lib/client.js (the DSH browser bundle) from src/
 npm run demo    # zero-dependency static server → http://localhost:4173/demo/
 ```
 
-There is no build step: the source **is** the distribution. `lib/*.js` are one-line re-export shims for the DSH loader convention; edit `src/`, never `lib/`.
+The ESM source **is** the distribution for demo and embedding. The one committed build artifact is `lib/client.js` — the DSH browser module bundle produced by `build/client.mjs` (zero-dependency, deterministic). After changing anything under `src/` (or the entry in `build/client.mjs`), run `npm run build` and commit the regenerated file; never hand-edit `lib/client.js`. `lib/index.js` stays a re-export shim for the DSH host entry.
 
 ## Project rules
 
@@ -26,7 +27,8 @@ There is no build step: the source **is** the distribution. `lib/*.js` are one-l
 3. **Validation at the write boundary.** Any new write path must go through `validate.js`. Errors are `ConfigValidationError` with a stable `code`; add the new code to the table in [docs/configuration-model.md](docs/configuration-model.md).
 4. **The store keeps deviations only.** Do not introduce any representation of "the full settings" — it would break the exact-inverse guarantee of restore.
 5. **Plain ESM, zero runtime dependencies.** `package.json` has no `dependencies` or `devDependencies` for a reason.
-6. **Style.** 2-space indent, LF, no semicolon-omission experiments — follow the existing files. Public exports get JSDoc (the source is the type documentation).
+6. **Only the ESM forms the build supports.** `build/client.mjs` handles exactly: `import { a } from "./x.js"`, `import name from "./y.json" with { type: "json" }`, `export function/const/class`, `export * from`, and `export { a } from`. It fails fast on anything else — so don't introduce other ESM syntax (bare imports, dynamic `import()`, `export { local }` of a same-file binding, default exports) without extending the build *and* its tests first.
+7. **Style.** 2-space indent, LF, no semicolon-omission experiments — follow the existing files. Public exports get JSDoc (the source is the type documentation).
 
 ## Adding a tool (or parameter) to the catalog
 
@@ -47,7 +49,8 @@ There is no build step: the source **is** the distribution. `lib/*.js` are one-l
 
 ## Pull request checklist
 
-- [ ] `npm test` passes (all suites)
+- [ ] `npm test` passes (all suites — the bundle contract test rebuilds and exercises `lib/client.js`)
+- [ ] `npm run build` re-run and the regenerated `lib/client.js` committed, whenever `src/` changed
 - [ ] `npm run demo` manually checked for the changed behavior (EN + 中文 if i18n touched)
 - [ ] Docs updated when user-visible behavior changed (README / docs/)
 - [ ] `CHANGELOG.md` has an entry under `Unreleased`

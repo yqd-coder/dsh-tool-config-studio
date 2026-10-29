@@ -1,4 +1,7 @@
 {
+  "meta": {
+    "title": "Tool Config Studio"
+  },
   "app": {
     "title": "DSH Tool Config Studio",
     "subtitle": "Browse every registered tool, adjust stored defaults, and restore any change with one click.",

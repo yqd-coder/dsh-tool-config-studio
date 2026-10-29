@@ -1,9 +1,9 @@
 # Dependencies
 node_modules/
 
-# Build output (this project ships prebuilt lib/ shims, but keep local experiments out)
+# Build output (build/client.mjs is a source file — only its artifacts are
+# committed to lib/; keep any local experiments out)
 dist/
-build/
 
 # Logs
 *.log

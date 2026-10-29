@@ -1,135 +1,20 @@
 /**
  * End-to-end UI smoke test.
  *
- * Node has no DOM, so this file installs a small in-memory DOM stub that
- * covers exactly the surface the app uses (createElement, append,
- * replaceChildren, class-based querySelector, attributes, dataset, event
- * listeners), then drives `mountToolConfigStudio` the same way a browser
- * would: mount, expand a tool, edit a value, hit a validation error, and
- * restore everything.
+ * Node has no DOM, so this file installs the shared in-memory DOM stub
+ * (see dom-stub.js), then drives `mountToolConfigStudio` the same way a
+ * browser would: mount, expand a tool, edit a value, hit a validation
+ * error, and restore everything.
  */
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { Element, Node, makeDocument } from "./dom-stub.js";
 
 // ------------------------------------------------------------ DOM stub
 
-class Node {}
-
-class Text extends Node {
-  constructor(text) {
-    super();
-    this.isElement = false;
-    this.parent = null;
-    this.textContent = String(text);
-  }
-}
-
-class Element extends Node {
-  constructor(tag) {
-    super();
-    this.isElement = true;
-    this.tagName = String(tag).toUpperCase();
-    this.parent = null;
-    this.children = [];
-    this.attributes = {};
-    this.dataset = {};
-    this.listeners = {};
-    this.className = "";
-    this.value = "";
-    this.checked = false;
-    this.disabled = false;
-  }
-
-  append(...nodes) {
-    for (const node of nodes) {
-      if (node === null || node === undefined) continue;
-      // The real DOM converts primitive children into text nodes.
-      const child = node instanceof Node ? node : new Text(node);
-      child.parent = this;
-      this.children.push(child);
-    }
-  }
-
-  replaceChildren(...nodes) {
-    this.children.length = 0;
-    this.append(...nodes);
-  }
-
-  remove() {
-    const parent = this.parent;
-    if (parent) {
-      const index = parent.children.indexOf(this);
-      if (index !== -1) parent.children.splice(index, 1);
-      this.parent = null;
-    }
-  }
-
-  setAttribute(name, value) {
-    this.attributes[name] = String(value);
-  }
-
-  getAttribute(name) {
-    return Object.hasOwn(this.attributes, name) ? this.attributes[name] : null;
-  }
-
-  addEventListener(type, handler) {
-    (this.listeners[type] ??= []).push(handler);
-  }
-
-  /** Test helper: fire all handlers registered for `type`. */
-  dispatch(type, event = {}) {
-    for (const handler of this.listeners[type] ?? []) handler(event);
-  }
-
-  get childElementCount() {
-    return this.children.filter((child) => child.isElement).length;
-  }
-
-  get textContent() {
-    return this.children.map((child) => child.textContent).join("");
-  }
-
-  /** Test helper: all element descendants in document order. */
-  descendants() {
-    const out = [];
-    const visit = (node) => {
-      for (const child of node.children) {
-        if (child.isElement) {
-          out.push(child);
-          visit(child);
-        }
-      }
-    };
-    visit(this);
-    return out;
-  }
-
-  matchesClass(name) {
-    return this.className.split(/\s+/).includes(name);
-  }
-
-  /** Test helper: matches a ".class" or tag selector (single token). */
-  matches(selector) {
-    return selector.startsWith(".")
-      ? this.matchesClass(selector.slice(1))
-      : this.tagName === selector.toUpperCase();
-  }
-
-  querySelector(selector) {
-    return this.descendants().find((element) => element.matches(selector)) ?? null;
-  }
-
-  querySelectorAll(selector) {
-    return this.descendants().filter((element) => element.matches(selector));
-  }
-}
-
 globalThis.Node = Node;
-globalThis.document = {
-  createElement: (tag) => new Element(tag),
-  createTextNode: (text) => new Text(text),
-};
+globalThis.document = makeDocument();
 
 // The persistence layer falls back to in-memory mode without localStorage.
 // `window.confirm` is stubbed so "restore all" does not block.

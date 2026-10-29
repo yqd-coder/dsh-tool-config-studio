@@ -131,13 +131,14 @@ function transform(id, source) {
   return out;
 }
 
-/** The DSH entry: sidebar panel + main panel over mountToolConfigStudio. */
+/** The DSH entry: two sidebar panels + two main panels. */
 const ENTRY_SOURCE = `
   "use strict";
   var React = require("react");
   var client = __req("src/client.js");
 
   var PANEL_ID = "tool-config-studio";
+  var SYS_PANEL_ID = "system-plugin-studio";
   var NS = "tool-config-studio";
 
   /** Sidebar icon: a settings gear (Feather-style 24px grid). */
@@ -167,9 +168,69 @@ const ENTRY_SOURCE = `
     return React.createElement("div", { ref: ref, className: "tcs-root" });
   };
 
+  /**
+   * Sidebar icon for the System Plugin Studio: sliders (Feather-style 24px
+   * grid) — distinct from the Tool Config Studio's gear.
+   */
+  var SystemIcon = function SystemIcon() {
+    return React.createElement("svg", {
+      width: 20, height: 20, viewBox: "0 0 24 24", fill: "none",
+      stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round",
+      strokeLinejoin: "round", "aria-hidden": true
+    },
+      React.createElement("line", { x1: "4", y1: "21", x2: "4", y2: "14" }),
+      React.createElement("line", { x1: "4", y1: "10", x2: "4", y2: "3" }),
+      React.createElement("line", { x1: "12", y1: "21", x2: "12", y2: "12" }),
+      React.createElement("line", { x1: "12", y1: "8", x2: "12", y2: "3" }),
+      React.createElement("line", { x1: "20", y1: "21", x2: "20", y2: "16" }),
+      React.createElement("line", { x1: "20", y1: "12", x2: "20", y2: "3" }),
+      React.createElement("line", { x1: "1", y1: "14", x2: "7", y2: "14" }),
+      React.createElement("line", { x1: "9", y1: "8", x2: "15", y2: "8" }),
+      React.createElement("line", { x1: "17", y1: "16", x2: "23", y2: "16" })
+    );
+  };
+
+  /*
+   * Adapter over the remote.settings service (the wire surface of the
+   * dsh-settings Host service). Every call resolves to an envelope of the
+   * shape { ok, value?, error? }, which the store unwraps.
+   * onDocumentUpdated returns the remote subscription disposer, so the app
+   * can tear it down with the page.
+   * (No backticks in this comment: the entry source is a template literal.)
+   */
+  var makeSettingsAdapter = function makeSettingsAdapter(ctx) {
+    var settings = ctx.remote.settings;
+    return {
+      describe: function () { return settings.describe(); },
+      mutate: function (ns, ops, revision) { return settings.mutate(ns, ops, revision); },
+      replace: function (ns, section, revision) { return settings.replace(ns, section, revision); },
+      onDocumentUpdated: function (cb) { return ctx.remote.$on("settings/document-updated", cb); }
+    };
+  };
+
+  /**
+   * Main panel: mounts the framework-free System Plugin Studio app into a ref
+   * div. The page closes over ctx to build the settings adapter; the host
+   * locale drives the sidebar label while the page content uses the plugin's
+   * own dictionaries.
+   */
+  var makeSystemPluginStudioPage = function makeSystemPluginStudioPage(ctx) {
+    return function SystemPluginStudioPage() {
+      var ref = React.useRef(null);
+      React.useEffect(function () {
+        if (!ref.current) return;
+        var adapter = makeSettingsAdapter(ctx);
+        var handle = client.mountSystemPluginStudio(ref.current, { adapter: adapter });
+        return function () { handle.unmount(); };
+      }, []);
+      return React.createElement("div", { ref: ref, className: "sys-root" });
+    };
+  };
+
   /** Services the row fiber must have before apply runs. */
-  __exports.inject = ["slots", "locale"];
+  __exports.inject = ["slots", "locale", "remote", "remote.settings"];
   __exports.PANEL_ID = PANEL_ID;
+  __exports.SYSTEM_PANEL_ID = SYS_PANEL_ID;
 
   /**
    * DSH client entry: register the sidebar panel and the main panel.
@@ -179,18 +240,21 @@ const ENTRY_SOURCE = `
     // The host removes locale entries only through the disposer that
     // register returns, and ctx.effect calls the effect's return value on
     // module teardown — so the disposer must be returned, which is also
-    // what makes an update re-materialize cleanly.
+    // what makes an update re-materialize cleanly. Both panels' labels live
+    // in this one namespace (re-registering an existing namespace throws,
+    // so the two keys must share a single register call).
     ctx.effect(function () {
       try {
         return ctx.locale.register(NS, {
-          en: { panel: "Tool Config Studio" },
-          zh: { panel: "工具配置" }
+          en: { panel: "Tool Config Studio", systemPanel: "System Plugin Studio" },
+          zh: { panel: "工具配置", systemPanel: "系统插件" }
         });
       } catch (error) {
-        // One-time migration: an older generation of this plugin did not
-        // return the disposer, so its namespace survived until a full shell
-        // reload. Its dictionaries are identical, so reusing the stale
-        // registration keeps the label correct without failing the sync.
+        // One-time migration: a pre-v0.2.2 generation of this plugin did
+        // not return the disposer, so its namespace survived until a full
+        // shell reload. The stale dictionary still carries the panel key, so
+        // the first label stays correct; the newer systemPanel key falls back
+        // to the raw key only until the namespace is re-registered.
         if (!/already has locale/.test(String(error))) throw error;
         return null;
       }
@@ -207,12 +271,30 @@ const ENTRY_SOURCE = `
       }, PanelIcon);
     });
 
+    ctx.slots.inject("sidebar.panellist", function () {
+      return ctx.slots.register({
+        name: "sidebar.panellist",
+        id: SYS_PANEL_ID,
+        order: 200,
+        label: function () { return t("systemPanel"); },
+        locale: NS
+      }, SystemIcon);
+    });
+
     ctx.slots.inject("main", function () {
       return ctx.slots.register({
         name: "main",
         key: PANEL_ID,
         locale: NS
       }, ToolConfigStudioPage);
+    });
+
+    ctx.slots.inject("main", function () {
+      return ctx.slots.register({
+        name: "main",
+        key: SYS_PANEL_ID,
+        locale: NS
+      }, makeSystemPluginStudioPage(ctx));
     });
   };
 `;

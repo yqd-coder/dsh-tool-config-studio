@@ -20,6 +20,10 @@ import { createToolConfigApp } from "./ui/app.js";
 import { createLocalPersistence } from "./core/persistence.js";
 import { ToolConfigStore } from "./core/store.js";
 import { createI18n, detectLanguage } from "./ui/i18n.js";
+// The mini-bundler's graph collector only follows `import` statements (not
+// `export … from`), so this binding — reused verbatim by the re-export below —
+// is what pulls the System Plugin Studio modules into the bundle.
+import { mountSystemPluginStudio } from "./system/app.js";
 
 /** Stable plugin id, as it appears in the catalog and storage keys. */
 export const PLUGIN_ID = "dsh-tool-config-studio";
@@ -73,3 +77,9 @@ export * from "./core/validate.js";
 export * from "./core/persistence.js";
 export { createToolConfigApp } from "./ui/app.js";
 export { createI18n, detectLanguage } from "./ui/i18n.js";
+
+// System Plugin Studio: the mount function plus its core (schema walker and
+// settings store), so a host or test can compose them independently.
+export { mountSystemPluginStudio } from "./system/app.js";
+export * from "./system/schema.js";
+export * from "./system/store.js";

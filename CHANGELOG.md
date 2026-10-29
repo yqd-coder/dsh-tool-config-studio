@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-29
+
+### Added
+
+- **System Plugin Studio panel** — a second sidebar/main panel pair (`system-plugin-studio`) that scans the live DSH settings document and visualizes every system plugin whose parameters are exposed as *volatile* (editable per profile): model adapters (`llm-pi-ai` providers and models), the active profile's `llm-deepseek` adapter, `agent-default-model`, and any other plugin that declares volatile fields.
+- **Schema-driven forms** — each entry renders from its schemastery schema: nested objects as labeled groups, dictionaries as keyed sections with Add/Remove, arrays as indexed items, enums as selects, booleans as selects, numbers/strings as validated text inputs, JSON as a textarea, literals as read-only values, and secrets as masked inputs that only ever show "set / not set" state.
+- **Staged edits with live working values** — edits are staged per entry (never written until Save), applied to a working copy so Add/Remove and in-progress fields are visible before flushing; invalid input fails inline and never reaches the store. Targeted "stage" updates refresh only the entry's badges/action row, so typing never rebuilds focused inputs.
+- **One-click restore** — per-field "Reset" (an `unset` op that falls back to the schema default) and per-entry "Restore defaults" (`replace` with an empty section), both confirmation-guarded. System defaults are preserved by the Host beneath the profile override, so restore is exact.
+- **Pushed refresh** — the panel subscribes to `settings/document-updated` and re-describes when another editor (or the shell itself) changes the document; the subscription is disposed with the page.
+- **New modules**: `src/system/schema.js` (schemastery traversal, leaf parsing/formatting, ops application), `src/system/store.js` (envelope unwrapping, staged edits, revision-checked `mutate`/`replace`, resync-on-conflict), `src/system/app.js` (framework-free DOM app, `mountSystemPluginStudio`).
+- **Locale**: ~29 `system.*` keys in `locale/en.json` and `locale/zh.json`; both panel labels (`panel`, `systemPanel`) now share one `tool-config-studio` locale registration.
+- **Styles**: `sys-*` theme reusing the existing `--tcs-*` design tokens.
+- **Tests**: 41 new cases — schema (17), store (14), a DOM smoke suite for the system app (9), and a bundle-contract test that mounts the system panel against a fake settings remote. Suite 42 → 83.
+
+### Changed
+
+- `apply(ctx)` now injects `["slots", "locale", "remote", "remote.settings"]` and registers two `sidebar.panellist` entries (orders 100/200) and two `main` panels.
+- `build/client.mjs` entry source: second icon, page factory, and settings adapter for the system panel.
+- Package version 0.2.2 → 0.3.0.
+
+### Notes
+
+- **Personas and system prompts are not editable in this panel.** `dsh-persona`, `dsh-system-prompt`, and `dsh-agent-instructions` expose zero volatile fields, so their parameters are deployment-level and outside the per-profile settings surface this panel edits. The panel's note (and the README) state this explicitly rather than pretending otherwise.
+- The panel is read/write only where the Host reports the settings document `writable`; otherwise it degrades to a read-only browser.
+
 ## [0.2.2] - 2026-10-29
 
 ### Fixed

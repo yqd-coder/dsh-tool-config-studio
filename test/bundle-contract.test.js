@@ -79,9 +79,34 @@ function makeSandbox() {
  *   - `ctx.effect(fn, label)` runs `fn` synchronously and calls whatever
  *     it returns when the effect is disposed (module teardown).
  */
+/** A minimal volatile-settings snapshot for the system panel mount test. */
+const SYSTEM_SETTINGS = {
+  writable: true,
+  hasDocument: true,
+  entries: [
+    {
+      ns: "agent-default-model",
+      schema: {
+        type: "object",
+        dict: {
+          provider: { type: "string", meta: {} },
+          model: { type: "string", meta: {} },
+        },
+      },
+      value: { provider: "vllm", model: "qwen3.8:27b" },
+      base: { provider: "deepseek", model: "deepseek-chat" },
+      user: { provider: "vllm", model: "qwen3.8:27b" },
+      secrets: [],
+      revision: 3,
+    },
+  ],
+};
+
 function makeClientContext() {
   const localeStore = new Map(); // ns -> Map(locale -> entries)
   const state = { effects: [], slotInjects: [], registered: {} };
+  const settingsCalls = [];
+  const settingsView = () => SYSTEM_SETTINGS.entries[0];
   const ctx = {
     effect: (fn, label) => {
       const cleanup = fn();
@@ -118,8 +143,19 @@ function makeClientContext() {
         return { meta, view };
       },
     },
+    remote: {
+      settings: {
+        describe: async () => { settingsCalls.push(["describe"]); return { ok: true, value: SYSTEM_SETTINGS }; },
+        mutate: async (ns, ops, revision) => { settingsCalls.push(["mutate", ns, ops, revision]); return { ok: true, value: settingsView() }; },
+        replace: async (ns, section, revision) => { settingsCalls.push(["replace", ns, section, revision]); return { ok: true, value: settingsView() }; },
+      },
+      $on: (event) => {
+        settingsCalls.push(["$on", event]);
+        return () => settingsCalls.push(["$on:disposed", event]);
+      },
+    },
   };
-  return { ctx, state, localeStore };
+  return { ctx, state, localeStore, settingsCalls };
 }
 
 test("the build emits a classic (non-ESM) client bundle", () => {
@@ -157,8 +193,12 @@ test("materialization exports the DSH entry and apply registers the panels", () 
   const entry = registrations[0].factory(hostRequire);
   // Round-trip through JSON: the bundle runs in a separate vm realm, so its
   // arrays carry a foreign Array.prototype and deepStrictEqual would fail.
-  assert.deepEqual(JSON.parse(JSON.stringify(entry.inject)), ["slots", "locale"]);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(entry.inject)),
+    ["slots", "locale", "remote", "remote.settings"],
+  );
   assert.equal(entry.PANEL_ID, PANEL_ID);
+  assert.equal(entry.SYSTEM_PANEL_ID, "system-plugin-studio");
   assert.equal(typeof entry.apply, "function");
   // The bundle must only require seeded platform singletons.
   assert.ok(required.every((spec) => spec === "react"));
@@ -173,9 +213,10 @@ test("materialization exports the DSH entry and apply registers the panels", () 
 
   entry.apply(ctx);
 
-  assert.deepEqual(state.slotInjects, ["sidebar.panellist", "main"]);
+  // Two sidebar rows and two main views, one per panel.
+  assert.deepEqual(state.slotInjects, ["sidebar.panellist", "sidebar.panellist", "main", "main"]);
 
-  const [sidebar] = state.registered["sidebar.panellist"];
+  const [sidebar, sidebarSys] = state.registered["sidebar.panellist"];
   assert.equal(sidebar.meta.id, PANEL_ID);
   assert.equal(sidebar.meta.order, 100);
   assert.equal(sidebar.meta.locale, PANEL_ID);
@@ -183,14 +224,22 @@ test("materialization exports the DSH entry and apply registers the panels", () 
   assert.equal(typeof sidebar.view, "function");
   assert.equal(sidebar.view().type, "svg");
 
-  const [main] = state.registered["main"];
+  assert.equal(sidebarSys.meta.id, "system-plugin-studio");
+  assert.equal(sidebarSys.meta.order, 200);
+  assert.equal(sidebarSys.meta.label(), "System Plugin Studio");
+  assert.equal(sidebarSys.view().type, "svg");
+
+  const [main, mainSys] = state.registered["main"];
   assert.equal(main.meta.name, "main");
   assert.equal(main.meta.key, PANEL_ID);
   assert.equal(typeof main.view, "function");
+  assert.equal(mainSys.meta.key, "system-plugin-studio");
 
   assert.equal(localeStore.size, 1);
   assert.equal(localeStore.get(PANEL_ID).get("en").panel, "Tool Config Studio");
   assert.equal(localeStore.get(PANEL_ID).get("zh").panel, "工具配置");
+  assert.equal(localeStore.get(PANEL_ID).get("en").systemPanel, "System Plugin Studio");
+  assert.equal(localeStore.get(PANEL_ID).get("zh").systemPanel, "系统插件");
 
   // The locale registration runs inside a tracked effect (disposable).
   assert.equal(state.effects.length, 1);
@@ -221,16 +270,16 @@ function materialize() {
   const code = bundleSource();
   const { sandbox, registrations } = makeSandbox();
   vm.runInNewContext(code, sandbox, { filename: "client.bundle.js" });
-  const { React } = makeReact();
+  const { React, pending } = makeReact();
   const hostRequire = (spec) => {
     if (spec !== "react") throw new Error(`unexpected host require: ${spec}`);
     return React;
   };
-  return registrations[0].factory(hostRequire);
+  return { entry: registrations[0].factory(hostRequire), pending };
 }
 
 test("apply is re-runnable: teardown releases the locale namespace", () => {
-  const entry = materialize();
+  const { entry } = materialize();
   const { ctx, state, localeStore } = makeClientContext();
 
   entry.apply(ctx);
@@ -246,7 +295,7 @@ test("apply is re-runnable: teardown releases the locale namespace", () => {
 });
 
 test("apply tolerates a stale registration left by a disposer-less build", () => {
-  const entry = materialize();
+  const { entry } = materialize();
   const { ctx, localeStore } = makeClientContext();
 
   // An older generation of this plugin registered these dictionaries but
@@ -257,4 +306,44 @@ test("apply tolerates a stale registration left by a disposer-less build", () =>
   entry.apply(ctx);
   assert.equal(localeStore.get(PANEL_ID).get("en").panel, "Tool Config Studio");
   assert.equal(ctx.locale.bind(PANEL_ID)("panel"), "Tool Config Studio");
+});
+
+/** One macrotask tick: let the async describe/mutate chain drain. */
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+
+test("the system panel mounts against the settings remote and disposes on teardown", async () => {
+  globalThis.Node = Node;
+  const { entry, pending } = materialize();
+  const { ctx, state, settingsCalls } = makeClientContext();
+  entry.apply(ctx);
+
+  const [, mainSys] = state.registered["main"];
+  assert.equal(mainSys.meta.key, "system-plugin-studio");
+
+  const container = new Element("div");
+  const element = mainSys.view();
+  assert.equal(element.type, "div");
+  assert.equal(element.props.className, "sys-root");
+  element.props.ref.current = container;
+
+  const cleanups = [];
+  for (const fn of pending.splice(0)) cleanups.push(fn());
+
+  // The initial describe is async; let it land before asserting.
+  await tick();
+
+  assert.equal(settingsCalls.filter((c) => c[0] === "describe").length, 1);
+  assert.equal(container.querySelectorAll(".sys-entry").length, SYSTEM_SETTINGS.entries.length);
+  assert.ok(container.querySelector(".sys-entry"), "the volatile entry card rendered");
+
+  // The pushed-refresh subscription was taken on the document-updated event.
+  assert.ok(
+    settingsCalls.some((c) => c[0] === "$on" && c[1] === "settings/document-updated"),
+    "subscribed to settings/document-updated",
+  );
+
+  // Tear down: the page effect cleanup unmounts the app and disposes $on.
+  for (const cleanup of cleanups) if (typeof cleanup === "function") cleanup();
+  assert.equal(container.children.length, 0);
+  assert.ok(settingsCalls.some((c) => c[0] === "$on:disposed"), "the pushed-refresh subscription was disposed");
 });

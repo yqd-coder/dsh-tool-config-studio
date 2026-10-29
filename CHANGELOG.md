@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-29
+
+### Fixed
+
+- Main panel did not scroll inside the DSH shell — content taller than the viewport was clipped. The panel root (`.tcs-root`) is now the scroll container (`height: 100%`, `overflow-y: auto`, `overscroll-behavior: contain`), following the main-page convention of DSH's own plugin manager. Standalone pages (no definite container height) are unaffected.
+
 ## [0.2.0] - 2026-10-29
 
 ### Added

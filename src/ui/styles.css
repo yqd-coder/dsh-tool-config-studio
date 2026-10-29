@@ -23,6 +23,18 @@
   --tcs-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
+/* Panel root rendered into the DSH main slot. The host gives the slot a
+   bounded region, so the panel itself is the scroll container (same
+   convention as DSH's own plugin-manager main page: height: 100% +
+   overflow auto). In a standalone page the container has no definite
+   height, so this degrades to normal document flow. */
+.tcs-root {
+  box-sizing: border-box;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .tcs {
   max-width: 980px;
   margin: 0 auto;

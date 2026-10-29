@@ -1,7 +1,7 @@
 {
   "name": "dsh-tool-config-studio",
   "description": "DSH bundle + client plugin: browse every registered tool, edit its configuration, and restore defaults with confidence.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

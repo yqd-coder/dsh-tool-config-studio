@@ -11,7 +11,12 @@
  *      main panel keyed `tool-config-studio`,
  *   5. actually mount the real UI — driven through the shared DOM stub and
  *      a minimal React stub the way the DSH shell would (render, attach the
- *      ref, flush mount effects, then tear down).
+ *      ref, flush mount effects, then tear down),
+ *   6. stay re-applicable across module teardown — the fake locale service
+ *      mirrors the host's non-idempotent `register` (it throws when the
+ *      namespace already holds a locale and hands back the only disposer),
+ *      so a plugin update re-running `apply` cannot collide with a stale
+ *      registration.
  */
 
 import assert from "node:assert/strict";
@@ -66,6 +71,57 @@ function makeSandbox() {
   };
 }
 
+/**
+ * Fake client context mirroring the host contract:
+ *   - `locale.register` is NOT idempotent: it throws when the namespace
+ *     already holds a locale, and returns the only disposer that removes
+ *     the entry again (the host has no separate unregister API);
+ *   - `ctx.effect(fn, label)` runs `fn` synchronously and calls whatever
+ *     it returns when the effect is disposed (module teardown).
+ */
+function makeClientContext() {
+  const localeStore = new Map(); // ns -> Map(locale -> entries)
+  const state = { effects: [], slotInjects: [], registered: {} };
+  const ctx = {
+    effect: (fn, label) => {
+      const cleanup = fn();
+      state.effects.push({ label, dispose: () => { if (typeof cleanup === "function") cleanup(); } });
+    },
+    locale: {
+      register: (ns, dicts) => {
+        let locales = localeStore.get(ns);
+        if (!locales) { locales = new Map(); localeStore.set(ns, locales); }
+        const keys = Object.keys(dicts);
+        for (const locale of keys) {
+          if (locales.has(locale)) throw new Error(`locale namespace "${ns}" already has locale "${locale}"`);
+          locales.set(locale, dicts[locale]);
+        }
+        return () => {
+          for (const locale of keys) {
+            const owner = localeStore.get(ns);
+            if (owner && owner.get(locale) === dicts[locale]) owner.delete(locale);
+          }
+        };
+      },
+      bind: (ns) => (key) => {
+        const dict = localeStore.get(ns)?.get("en");
+        return dict && Object.prototype.hasOwnProperty.call(dict, key) ? dict[key] : key;
+      },
+    },
+    slots: {
+      inject: (slot, cb) => {
+        state.slotInjects.push(slot);
+        cb();
+      },
+      register: (meta, view) => {
+        (state.registered[meta.name] ??= []).push({ meta, view });
+        return { meta, view };
+      },
+    },
+  };
+  return { ctx, state, localeStore };
+}
+
 test("the build emits a classic (non-ESM) client bundle", () => {
   const code = bundleSource();
   assert.match(code, /window\.__ModuleLoader__\.load\(/);
@@ -112,31 +168,8 @@ test("materialization exports the DSH entry and apply registers the panels", () 
   assert.equal(styleTags[0].getAttribute("data-plugin-css"), PACKAGE_ID);
   assert.match(styleTags[0].textContent, /--tcs-bg/);
 
-  // Fake client context: record effects, locale dictionaries, and slots.
-  const state = { effects: [], locale: [], slotInjects: [], registered: {} };
-  const ctx = {
-    effect: (fn, label) => {
-      state.effects.push({ label, dispose: fn() });
-    },
-    locale: {
-      register: (ns, dicts) => state.locale.push({ ns, dicts }),
-      bind: (ns) => (key) => {
-        const found = state.locale.find((e) => e.ns === ns);
-        const dict = found && found.dicts.en;
-        return dict && Object.prototype.hasOwnProperty.call(dict, key) ? dict[key] : key;
-      },
-    },
-    slots: {
-      inject: (slot, cb) => {
-        state.slotInjects.push(slot);
-        cb();
-      },
-      register: (meta, view) => {
-        (state.registered[meta.name] ??= []).push({ meta, view });
-        return { meta, view };
-      },
-    },
-  };
+  // Fake client context mirroring the host's non-idempotent locale contract.
+  const { ctx, state, localeStore } = makeClientContext();
 
   entry.apply(ctx);
 
@@ -155,10 +188,9 @@ test("materialization exports the DSH entry and apply registers the panels", () 
   assert.equal(main.meta.key, PANEL_ID);
   assert.equal(typeof main.view, "function");
 
-  assert.equal(state.locale.length, 1);
-  assert.equal(state.locale[0].ns, PANEL_ID);
-  assert.equal(state.locale[0].dicts.en.panel, "Tool Config Studio");
-  assert.equal(state.locale[0].dicts.zh.panel, "工具配置");
+  assert.equal(localeStore.size, 1);
+  assert.equal(localeStore.get(PANEL_ID).get("en").panel, "Tool Config Studio");
+  assert.equal(localeStore.get(PANEL_ID).get("zh").panel, "工具配置");
 
   // The locale registration runs inside a tracked effect (disposable).
   assert.equal(state.effects.length, 1);
@@ -182,4 +214,47 @@ test("materialization exports the DSH entry and apply registers the panels", () 
   // Tear down: the effect cleanup unmounts the app completely.
   for (const cleanup of cleanups) if (typeof cleanup === "function") cleanup();
   assert.equal(container.children.length, 0);
+});
+
+/** Materialize the entry against a fresh sandbox + React stub. */
+function materialize() {
+  const code = bundleSource();
+  const { sandbox, registrations } = makeSandbox();
+  vm.runInNewContext(code, sandbox, { filename: "client.bundle.js" });
+  const { React } = makeReact();
+  const hostRequire = (spec) => {
+    if (spec !== "react") throw new Error(`unexpected host require: ${spec}`);
+    return React;
+  };
+  return registrations[0].factory(hostRequire);
+}
+
+test("apply is re-runnable: teardown releases the locale namespace", () => {
+  const entry = materialize();
+  const { ctx, state, localeStore } = makeClientContext();
+
+  entry.apply(ctx);
+  assert.equal(localeStore.get(PANEL_ID).size, 2);
+
+  // The module record is torn down (plugin unload or an in-place update).
+  for (const effect of state.effects) effect.dispose();
+  assert.equal(localeStore.get(PANEL_ID).size, 0, "the register disposer released the namespace");
+
+  // Re-materialization must not collide with the old registration.
+  entry.apply(ctx);
+  assert.equal(localeStore.get(PANEL_ID).get("en").panel, "Tool Config Studio");
+});
+
+test("apply tolerates a stale registration left by a disposer-less build", () => {
+  const entry = materialize();
+  const { ctx, localeStore } = makeClientContext();
+
+  // An older generation of this plugin registered these dictionaries but
+  // swallowed the disposer, so the namespace survived its teardown.
+  ctx.locale.register(PANEL_ID, { en: { panel: "Tool Config Studio" }, zh: { panel: "工具配置" } });
+
+  // The new apply must not fail the sync over the stale, identical entries.
+  entry.apply(ctx);
+  assert.equal(localeStore.get(PANEL_ID).get("en").panel, "Tool Config Studio");
+  assert.equal(ctx.locale.bind(PANEL_ID)("panel"), "Tool Config Studio");
 });

@@ -70,7 +70,7 @@ The demo imports the real plugin source, so it must be served over `http://` (ES
 npm test
 ```
 
-The suite uses Node's built-in test runner (`node --test test/`) — no framework, no installation step. 40 tests cover catalog integrity, the store, validation, persistence, an end-to-end UI smoke test, and the built DSH bundle's loader contract.
+The suite uses Node's built-in test runner (`node --test test/`) — no framework, no installation step. 42 tests cover catalog integrity, the store, validation, persistence, an end-to-end UI smoke test, and the built DSH bundle's loader contract — including that `apply` stays re-runnable across a module teardown, the way an in-place plugin update does it.
 
 ### Embed in your own web app
 

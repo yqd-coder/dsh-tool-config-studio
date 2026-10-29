@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-29
+
+### Fixed
+
+- **Updating the plugin in a running shell failed** with `locale namespace "tool-config-studio" already has locale "en"`. The host removes locale entries only through the disposer `ctx.locale.register` returns, and `ctx.effect` calls the effect's return value on module teardown — but the dictionary effect swallowed that disposer, so the namespace was never released and the next materialization's registration threw, aborting the sync. The effect now returns the disposer, and tolerates the one-time migration from a disposer-less build (identical dictionaries) instead of failing the whole sync.
+- **Bundle contract tests** now mirror the host's non-idempotent `locale.register` (it throws on a held locale and hands back the only disposer), and two regression tests cover an update re-materialization and the stale-registration migration. Suite 40 → 42.
+
 ## [0.2.1] - 2026-10-29
 
 ### Fixed
@@ -51,6 +58,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Test suite**: 37 tests on `node --test` — catalog integrity, store behavior matrix, validation, persistence (in-memory storage doubles), and an end-to-end UI smoke test on a minimal in-memory DOM.
 - **Documentation**: bilingual README, architecture and configuration-model docs, contributing guide.
 
-[Unreleased]: https://github.com/yqd-coder/dsh-tool-config-studio/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/yqd-coder/dsh-tool-config-studio/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/yqd-coder/dsh-tool-config-studio/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/yqd-coder/dsh-tool-config-studio/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/yqd-coder/dsh-tool-config-studio/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/yqd-coder/dsh-tool-config-studio/releases/tag/v0.1.0

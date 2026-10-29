@@ -143,9 +143,11 @@ The built bundle (`lib/client.js`) follows the loader protocol of DSH's shipped 
 2. **Materialization** — on first import (row activation) the loader calls `factory(require)` once and memoizes the result. `require` is the synchronous module-table require, seeded with platform singletons (`react`, `react/jsx-runtime`); this bundle only ever requires `react`.
 3. **Side effects belong to materialization** — the CSS is injected inside the factory as a `<style data-plugin-css="dsh-tool-config-studio">` tag, which the shell's loader tracks (and removes when the row is torn down).
 4. **Entry exports** — the materialized module exposes the client-entry contract: `inject: ["slots", "locale"]` (the services the row fiber must have) and `apply(ctx)`.
-5. **`apply(ctx)`** — registers, via `ctx.effect` (disposable with the entry's lifetime), a locale namespace whose `panel` key drives the sidebar label in the host language, then registers two slots:
+5. **`apply(ctx)`** — registers, via `ctx.effect` (disposed with the entry's lifetime; the callback's *return value* is invoked at teardown), a locale namespace whose `panel` key drives the sidebar label in the host language, then registers two slots:
    - `sidebar.panellist` — the panel entry: `{ id: "tool-config-studio", order: 100, label: () => t("panel"), locale }` + an SVG icon component;
    - `main` — the panel body, keyed `tool-config-studio`: a small React component that renders a ref `<div>` and, in a `useEffect`, calls `mountToolConfigStudio(ref.current)` and unmounts in the cleanup.
+
+   The locale callback must **return the disposer that `locale.register` hands back**. The host's `register` is not idempotent (it throws when the namespace already holds the locale) and that disposer is the only way an entry is ever removed — so swallowing it lets the namespace survive module teardown, and the next in-place update's re-`apply` aborts the sync with `already has locale`. The entry also tolerates that one migration case (a stale, identical registration left by a disposer-less build) so an update never fails over it. `test/bundle-contract.test.js` mirrors the host's contract and covers both scenarios.
 
 So the DSH surface and the standalone demo run the *exact same* `mountToolConfigStudio` — the React component is a 15-line shell around the framework-free DOM app.
 

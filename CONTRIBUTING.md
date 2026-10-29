@@ -13,7 +13,7 @@ Thanks for your interest! The project is small on purpose — the bar for contri
 git clone https://github.com/yqd-coder/dsh-tool-config-studio.git
 cd dsh-tool-config-studio
 
-npm test        # node --test test/   — 40 tests, ~2s
+npm test        # node --test test/   — 42 tests, ~2s
 npm run build   # rebuild lib/client.js (the DSH browser bundle) from src/
 npm run demo    # zero-dependency static server → http://localhost:4173/demo/
 ```
